@@ -1,0 +1,15 @@
+{
+  "name": "lazyploywatcher",
+  "version": "1.0.0",
+  "description": "Watches servers and uploads status to a Lazyploy server",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Michael Allar",
+  "license": "ISC",
+  "dependencies": {
+    "mkdirp": "^0.5.1",
+    "unirest": "^0.4.2"
+  }
+}
