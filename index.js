@@ -1,43 +1,97 @@
 var os = require('os');
 var dns = require('dns');
-var fs = require('fs');
+var http = require('http');
+var fs = require('fs-extra');
+var Promise = require("bluebird");
+var readdirAsync = Promise.promisify(fs.readdir);
 var path = require('path');
 var unirest = require('unirest');
 var mkdirp = require('mkdirp');
+var unzip = require('unzip');
+var child_process = require('child_process');
+
+// Prototypes
+Array.prototype.firstElementIncluding = function(includeSearch) {
+    for (i in this) {
+        if (this[i].includes(includeSearch)) {
+            return this[i];
+        }
+    }
+    return null;
+}
 
 // User settings
 var LazyployUrl = 'http://localhost/';
 var Project = "GenericShooter";
 var Platform = "WindowsServer";
+var PlatformName = Platform.includes('Windows') ? 'Win64' : 'Linux';
+
+var SearchExt = Platform.includes('Windows') ? '.exe' : '';
+var EngineBinaryFolder = null;
+var ProjectBinaryFolder = null;
 
 // App Settings
 var StorageDir = "./storage";
+var TempDir = path.join(StorageDir, 'temp');
 var BuildsDir = path.join(StorageDir, Project, Platform);
+mkdirp(TempDir);
 mkdirp(BuildsDir);
 
-var CurrentBuild = -1;
+var LatestBuild = null;
+var bBusy = false;
 
 var ServerStatus = {
     hostname: os.hostname(),
     localip: '0.0.0.0:0000',
-    platform: 'WindowsNoEditor',
-    build: 0,
+    platform: Platform,
+    build: -1,
     status: 'Dandy' 
 };
+
+// Process info
+var RunningProcess = null;
 
 dns.lookup(os.hostname(), function (err, addr, fam) {
    ServerStatus.localip = addr + ":0000";
 });
 
+ServerStatus.build = getLatestLocalBuildId();
+
 function mainLoop() {
+    updateCurrentStatus();
     heartbeat();
     
-    getLatestRelevantBuild().then(function(build) {
-        console.log(build);
-        console.log('Latest: ' + getLatestLocalBuildId());
-    }).catch(function (err) {
-        console.error(err); 
-    });
+    if (!bBusy) {
+        getCurrentBuildIsUpToDate().then( function(uptodate) {
+            if (uptodate) {
+                console.log("Current build (" + ServerStatus.build.toString() + ") up to date.");
+                if (RunningProcess == null) {
+                    bBusy = true;
+                    console.log("Starting process.");
+                    forceStatusUpdate('STARTING');
+                    startRunningProcess().then(function () {
+                        bBusy = false;  
+                    }).catch(function(err) {
+                        forceStatusUpdate('ERROR: PLEASE SEND HELP');
+                    });
+                }
+            } else {
+                bBusy = true;
+                console.log("New build found. Starting update.")
+                killRunningProcess().then(function() {
+                    downloadLatestBuildFile().then(function() {
+                        startRunningProcess().then(function () {
+                            bBusy = false;  
+                        }).catch(function(err) {
+                            forceStatusUpdate('ERROR: PLEASE SEND HELP');
+                        });
+                    }).catch(function (err) {
+                        forceStatusUpdate('ERROR: PLEASE SEND HELP');
+                    });
+                });
+            }
+        });
+    }
     
     loopTimer = setTimeout(mainLoop, 5000);
 }
@@ -48,6 +102,16 @@ function createServerRecord() {
     .end(function (response) {
        // Do nothing 
     });
+}
+
+function updateCurrentStatus() {
+    if (!bBusy) {
+        if (RunningProcess == null) {
+            ServerStatus.status = "Down";
+        } else {
+            ServerStatus.status = "Running";
+        }
+    }
 }
 
 function heartbeat() {
@@ -65,11 +129,133 @@ function heartbeat() {
     });
 }
 
+function forceStatusUpdate(newStatus) {
+    ServerStatus.status = newStatus;
+    heartbeat();    
+}
+
+// Process Management
+function killRunningProcess() {
+    return new Promise(function(resolve, reject) {
+        if (RunningProcess == null) {
+            resolve();
+            return;
+        }
+        console.log("Shutting down running process.");
+        forceStatusUpdate('Shutting Down');
+        RunningProcess.kill();        
+        var checkProcess = function() {
+            if (RunningProcess == null) {
+                resolve();
+                return;
+            }
+            console.log("Waiting for process to die.");
+            setTimeout(checkProcess, 1000); 
+        };
+        
+        checkProcess();        
+    });
+}
+
+function findExecFileInDir(Dir, SearchExt) {
+    return new Promise(function(resolve, reject) {
+        readdirAsync(Dir)
+        .then((files) => {
+            if (files.length > 0) {
+                execFile = files.firstElementIncluding(SearchExt);
+                if (execFile != null) {
+                    console.log(`Found execFile: ${execFile}`);
+                    resolve(execFile); 
+                }        
+            }
+        }).catch((err) => {
+           reject(`Failed to find exec file in ${Dir}`);
+        });
+    });
+}
+
+function findExecFile() {
+    return new Promise(function(resolve, reject) {       
+       var isValidBuild = false;
+       
+       //@TODO: Make this work for Linux
+        
+       // Check for C++ project binary first
+        console.log(`Checking for C++ project binary in: ${ProjectBinaryFolder}`);
+        findExecFileInDir(ProjectBinaryFolder, SearchExt).then((execFile) => {
+            resolve(path.join(ProjectBinaryFolder, execFile));
+        }).catch( (err) => {
+            // Check for Blueprint project binary first
+            console.log(`Checking for Blueprint project binary in: ${EngineBinaryFolder}`);
+            findExecFileInDir(EngineBinaryFolder, SearchExt).then((execFile) => {
+                resolve(path.join(EngineBinaryFolder, execFile));
+            }).catch( (err) => {
+                console.error('Failed to find either C++ or Blueprint project binary.');
+                reject('Failed to find either C++ or Blueprint project binary.');
+            });    
+        }); 
+    });
+}
+
+function startRunningProcess() {
+    return new Promise(function(resolve, reject) {
+        if (RunningProcess != null) {
+            resolve();
+            return;
+        }
+        
+        EngineBinaryFolder = path.join(BuildsDir, ServerStatus.build.toString(), 'Engine', 'Binaries', PlatformName);
+        ProjectBinaryFolder = path.join(BuildsDir, ServerStatus.build.toString(), Project, 'Binaries', PlatformName);
+        
+        findExecFile().then( (execFile) => {
+            var opts = {
+                cwd: path.dirname(execFile),
+                detached: true                    
+            };
+            var args = [];
+            
+            // If BP project, need to specifiy .uproject file
+            if (execFile.includes('Engine')) {
+                args.push(`../../../${Project}/${Project}.uproject`);
+            }
+            
+            //args.push('-log');
+           
+            console.log(`Starting process: ${execFile}`);
+            
+            RunningProcess = child_process.spawn(path.basename(execFile), args, opts);
+            RunningProcess.on('error', (err) => {
+                console.error(`Error starting process: ${err}`);
+                reject(`Error starting process: ${err}`) ;
+                return;
+            });
+            RunningProcess.stdout.on('data', (data) => {
+                console.log(`Child process output: ${data}`); 
+            });
+            RunningProcess.stderr.on('data', (data) => {
+                console.error(`Child process ERROR output: ${data}`); 
+            });
+            RunningProcess.on('close', (code) => {
+                console.log("Process closed.");
+                RunningProcess = null;
+            });  
+            
+            resolve();     
+
+        }).catch( (err) => {
+            console.error('ERROR starting process: Can not find executable!');
+            reject('ERROR starting process: Can not find executable!');
+        });        
+    });
+}
+
+// Build Management
 function getLatestRelevantBuild() {
-    return new Promise( function(resolve, reject) {
+    return new Promise(function(resolve, reject) {
         unirest.get(LazyployUrl + 'api/builds')
         .query({ project: Project })
         .query('platforms[$like][0]=%'+ Platform + '%')
+        .query('status[$like][0]=%Completed%')
         .query('$sort[id]=-1')
         .query('$limit=1')
         .end(function (response) {
@@ -98,9 +284,67 @@ function getLatestLocalBuildId() {
     return Math.max.apply(Math, builds);
 }
 
+function getCurrentBuildIsUpToDate() {
+    return new Promise(function(resolve, reject) {
+        getLatestRelevantBuild().then(function(build) {
+            LatestBuild = build;
+            resolve(LatestBuild.id == ServerStatus.build);
+            return;
+        }).catch(function (err) {
+            if (ServerStatus.build == -1) {
+                resolve(true);
+                return;
+            }
+            reject(err);
+        });
+    });
+}
+
 
 // File Management
 
+function downloadLatestBuildFile()
+{
+    return new Promise(function(resolve, reject) {
+        forceStatusUpdate('Downloading Build ' + LatestBuild.id.toString());   
+        var file = fs.createWriteStream(path.join(TempDir, LatestBuild.id + '.zip'));
+        file.on('open', function(fd) {
+            var url = LazyployUrl + 'api/builds/' + LatestBuild.id.toString() + '/download/' +  Platform + '.zip';
+            console.log(url);
+            http.get(url, function(res) {
+                res.on('data', function(chunk) {
+                    file.write(chunk);
+                }).on('end', function() {
+                    file.end();
+                    var buildZipPath = path.join(BuildsDir, LatestBuild.id + '.zip');
+                    fs.removeSync(buildZipPath);
+                    fs.move(path.join(TempDir, LatestBuild.id + '.zip'), buildZipPath, { clobber: true }, function(err) {
+                        if (err) {
+                            console.error('Failed to move temp download file to build directory. Error:' + err);
+                            reject(err);
+                            return;
+                        }
+                        console.log("Downloaded latest build. Extracting...");
+                        forceStatusUpdate('Extracting Build ' + LatestBuild.id.toString());  
+                        var extractDir = path.join(BuildsDir, LatestBuild.id.toString());
+                        fs.removeSync(extractDir);
+                        fs.createReadStream(buildZipPath)
+                            .pipe(unzip.Extract({path: extractDir}))
+                            .on('close', function () {
+                                console.log("Build extracted.");
+                                forceStatusUpdate('Extracted Build' + LatestBuild.id.toString());  
+                                ServerStatus.build = getLatestLocalBuildId();
+                                resolve();  
+                            }).on('error', function (readError) {
+                                console.error('Failed reading in build zip. Error:' + readError);
+                                reject(readError);
+                            });
+                    });
+                });
+            });
+        });
+    });
+}
 
 
 // Kick off main loop
