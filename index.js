@@ -352,9 +352,19 @@ function downloadLatestBuildFile()
                         forceStatusUpdate('Extracting Build ' + LatestBuild.id.toString());  
                         var extractDir = path.join(BuildsDir, LatestBuild.id.toString());
                         fs.removeSync(extractDir);
+                        mkdirp.sync(extractDir);
                         fs.createReadStream(buildZipPath)
-                            .pipe(unzip.Extract({path: extractDir}))
-                            .on('close', function () {
+                            .pipe(unzip.Parse())
+                            .on('entry', (entry) => {
+                                var filename = entry.path.replace(/\\/g, '/');
+                                if (entry.type == 'Directory') {
+                                    mkdirp.sync(path.join(extractDir, filename));
+                                } else {
+                                    filename = path.join(extractDir, filename);
+                                    mkdirp.sync(path.dirname(filename));
+                                    entry.pipe(fs.createWriteStream(filename));
+                                }
+                            }).on('close', function () {
                                 console.log("Build extracted.");
                                 forceStatusUpdate('Extracted Build' + LatestBuild.id.toString());  
                                 ServerStatus.build = getLatestLocalBuildId();
