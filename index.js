@@ -238,7 +238,9 @@ function startRunningProcess() {
             var args = [];
             
             // If BP project, need to specifiy .uproject file
-            if (execFile.includes('Engine')) {
+            // @TODO: Confirm this is valid for Linux C++ projects
+            var bAddUprojectPath = execFile.includes('Engine') || Platform.includes('Linux');         
+            if (bAddUprojectPath) {
                 args.push(`../../../${Project}/${Project}.uproject`);
             }
             
@@ -247,7 +249,12 @@ function startRunningProcess() {
            
             console.log(`Starting process: ${execFile}`);
             
-            RunningProcess = child_process.spawn(path.basename(execFile), args, opts);
+            if (Platform.includes('Linux')) {
+                RunningProcess = child_process.spawn('./' + path.basename(execFile), args, opts);
+            } else {
+                RunningProcess = child_process.spawn(path.basename(execFile), args, opts);
+            } 
+                       
             RunningProcess.on('error', (err) => {
                 console.error(`Error starting process: ${err}`);
                 reject(`Error starting process: ${err}`) ;
