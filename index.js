@@ -211,7 +211,7 @@ function startRunningProcess() {
         findExecFile().then( (execFile) => {
             var opts = {
                 cwd: path.dirname(execFile),
-                detached: true                    
+                detached: false                    
             };
             var args = [];
             
@@ -220,7 +220,8 @@ function startRunningProcess() {
                 args.push(`../../../${Project}/${Project}.uproject`);
             }
             
-            //args.push('-log');
+            args.push('-stdout');
+            args.push('-AllowStdOutLogVerbosity');
            
             console.log(`Starting process: ${execFile}`);
             
