@@ -22,9 +22,9 @@ Array.prototype.firstElementIncluding = function(includeSearch) {
 }
 
 // Expected args
-// -lazyploy=http://lazyploy.server/
-// -project=ProjectName
-// -platform=TargetPlatform
+// --lazyploy=http://lazyploy.server/
+// --project=ProjectName
+// --platform=TargetPlatform
 
 // Default User settings
 var LazyployUrl = 'http://localhost/';
@@ -45,8 +45,8 @@ var ProjectBinaryFolder = null;
 var StorageDir = "./storage";
 var TempDir = path.join(StorageDir, 'temp');
 var BuildsDir = path.join(StorageDir, Project, Platform);
-mkdirp(TempDir);
-mkdirp(BuildsDir);
+mkdirp.sync(TempDir);
+mkdirp.sync(BuildsDir);
 
 var LatestBuild = null;
 var bBusy = false;
@@ -77,7 +77,7 @@ function mainLoop() {
         getCurrentBuildIsUpToDate().then( function(uptodate) {
             if (uptodate) {
                 console.log("Current build (" + ServerStatus.build.toString() + ") up to date.");
-                if (RunningProcess == null) {
+                if (RunningProcess == null && ServerStatus.build != -1) {
                     bBusy = true;
                     console.log("Starting process.");
                     forceStatusUpdate('STARTING');
