@@ -9,6 +9,7 @@ var unirest = require('unirest');
 var mkdirp = require('mkdirp');
 var unzip = require('unzip');
 var child_process = require('child_process');
+var argv = require('minimist')(process.argv.slice(2));
 
 // Prototypes
 Array.prototype.firstElementIncluding = function(includeSearch) {
@@ -176,35 +177,46 @@ function findExecFileInDir(Dir, SearchExt) {
                 execFile = files.firstElementIncluding(SearchExt);
                 if (execFile != null) {
                     console.log(`Found execFile: ${execFile}`);
-                    resolve(execFile); 
+                    resolve(execFile);
+                    return;
                 }        
             }
+            reject(`Failed to find exec file in ${Dir}`);
         }).catch((err) => {
-           reject(`Failed to find exec file in ${Dir}`);
+           reject(`Failed to read directory ${Dir}`);
         });
     });
 }
 
 function findExecFile() {
     return new Promise(function(resolve, reject) {       
-       var isValidBuild = false;
+        var isValidBuild = false;
        
-       //@TODO: Make this work for Linux
-        
-       // Check for C++ project binary first
-        console.log(`Checking for C++ project binary in: ${ProjectBinaryFolder}`);
-        findExecFileInDir(ProjectBinaryFolder, SearchExt).then((execFile) => {
-            resolve(path.join(ProjectBinaryFolder, execFile));
-        }).catch( (err) => {
-            // Check for Blueprint project binary first
-            console.log(`Checking for Blueprint project binary in: ${EngineBinaryFolder}`);
-            findExecFileInDir(EngineBinaryFolder, SearchExt).then((execFile) => {
-                resolve(path.join(EngineBinaryFolder, execFile));
+        // Linux exec is always ProjectName/Binaries/Linux/ProjectName
+        if (Platform.includes('Linux')) {
+            console.log(`Checking for Linux project binary in: ${ProjectBinaryFolder}`);
+            findExecFileInDir(ProjectBinaryFolder, SearchExt).then((execFile) => {
+                resolve(path.join(ProjectBinaryFolder, execFile));
             }).catch( (err) => {
-                console.error('Failed to find either C++ or Blueprint project binary.');
-                reject('Failed to find either C++ or Blueprint project binary.');
-            });    
-        }); 
+                console.error('Failed to find Linux project binary.');
+                reject('Failed to find Linux project binary.');
+            });
+        } else { // Windows
+            // Check for C++ project binary first
+            console.log(`Checking for C++ project binary in: ${ProjectBinaryFolder}`);
+            findExecFileInDir(ProjectBinaryFolder, SearchExt).then((execFile) => {
+                resolve(path.join(ProjectBinaryFolder, execFile));
+            }).catch( (err) => {
+                // Check for Blueprint project binary first
+                console.log(`Checking for Blueprint project binary in: ${EngineBinaryFolder}`);
+                findExecFileInDir(EngineBinaryFolder, SearchExt).then((execFile) => {
+                    resolve(path.join(EngineBinaryFolder, execFile));
+                }).catch( (err) => {
+                    console.error('Failed to find either C++ or Blueprint project binary.');
+                    reject('Failed to find either C++ or Blueprint project binary.');
+                });    
+            }); 
+        }        
     });
 }
 
