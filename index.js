@@ -10,6 +10,7 @@ var mkdirp = require('mkdirp');
 var unzip = require('unzip');
 var child_process = require('child_process');
 var argv = require('minimist')(process.argv.slice(2));
+var uuid = require('node-uuid');
 
 // Prototypes
 Array.prototype.firstElementIncluding = function(includeSearch) {
@@ -25,16 +26,19 @@ Array.prototype.firstElementIncluding = function(includeSearch) {
 // --lazyploy=http://lazyploy.server/
 // --project=ProjectName
 // --platform=TargetPlatform
+// --sessionowner=SessionOwner
 
 // Default User settings
 var LazyployUrl = 'http://localhost/';
 var Project = "GenericShooter";
 var Platform = "WindowsServer";
+var SessionOwner = "Allar";
 
 // Set any settings passed via command line
 if (argv.hasOwnProperty('lazyploy')){ LazyployUrl = argv.lazyploy; }
 if (argv.hasOwnProperty('project')){ Project = argv.project; }
 if (argv.hasOwnProperty('platform')){ Platform = argv.platform; }
+if (argv.hasOwnProperty('sessionowner')){ SessionOwner = argv.sessionowner; }
 
 var PlatformName = Platform.includes('Windows') ? 'Win64' : 'Linux';
 var SearchExt = Platform.includes('Windows') ? '.exe' : Project;
@@ -259,6 +263,11 @@ function startRunningProcess() {
             
             args.push('-stdout');
             args.push('-AllowStdOutLogVerbosity');
+            args.push('-Messaging');
+            args.push(`-InstanceId=${uuid.v4()}`);
+            args.push(`-SessionId=${uuid.v4()}`);
+            args.push(`-SessionOwner=${SessionOwner}`);
+            args.push(`-SessionName=${Platform}_${new Date().toString()}`);
            
             console.log(`Starting process: ${execFile}`);
             
