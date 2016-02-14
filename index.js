@@ -7,7 +7,7 @@ var readdirAsync = Promise.promisify(fs.readdir);
 var path = require('path');
 var unirest = require('unirest');
 var mkdirp = require('mkdirp');
-var unzip = require('unzip');
+var unzip = require('decompress-zip');
 var child_process = require('child_process');
 var argv = require('minimist')(process.argv.slice(2));
 
@@ -352,17 +352,21 @@ function downloadLatestBuildFile()
                         forceStatusUpdate('Extracting Build ' + LatestBuild.id.toString());  
                         var extractDir = path.join(BuildsDir, LatestBuild.id.toString());
                         fs.removeSync(extractDir);
-                        fs.createReadStream(buildZipPath)
-                            .pipe(unzip.Extract({path: extractDir}))
-                            .on('close', function () {
-                                console.log("Build extracted.");
-                                forceStatusUpdate('Extracted Build' + LatestBuild.id.toString());  
-                                ServerStatus.build = getLatestLocalBuildId();
-                                resolve();  
-                            }).on('error', function (readError) {
-                                console.error('Failed reading in build zip. Error:' + readError);
-                                reject(readError);
-                            });
+                        var unzipper = new unzip(buildZipPath);
+                        unzipper.on('error', (unzipError) => {
+                            console.error('Failed reading in build zip. Error:' + unzipError);
+                            reject(unzipError);
+                        });
+                        unzipper.on('extract', (unzipLog) => {
+                            console.log("Build extracted.");
+                            forceStatusUpdate('Extracted Build' + LatestBuild.id.toString());  
+                            ServerStatus.build = getLatestLocalBuildId();
+                            resolve();
+                        });
+                        //@TODO: Unzip progress
+                        unzipper.extract({
+                            path: extractDir
+                        });
                     });
                 });
             });
