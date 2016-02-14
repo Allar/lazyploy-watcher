@@ -250,7 +250,8 @@ function startRunningProcess() {
             console.log(`Starting process: ${execFile}`);
             
             if (Platform.includes('Linux')) {
-                RunningProcess = child_process.spawn('./' + path.basename(execFile), args, opts);
+                child_process.execSync(`chmod +x ${Project}`, opts);
+		RunningProcess = child_process.spawn('./' + path.basename(execFile), args, opts);
             } else {
                 RunningProcess = child_process.spawn(path.basename(execFile), args, opts);
             } 
