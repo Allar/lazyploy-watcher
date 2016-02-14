@@ -63,9 +63,22 @@ var ServerStatus = {
 // Process info
 var RunningProcess = null;
 
-dns.lookup(os.hostname(), function (err, addr, fam) {
-   ServerStatus.localip = addr + ":0000";
-});
+// Get local ip address
+// https://github.com/dominictarr/my-local-ip/blob/master/index.js
+
+function getLocalIp() {
+    var nics = os.networkInterfaces();
+    for(var k in nics) {
+        var inter = nics[k]
+        for(var j in inter) {
+            if(inter[j].family === 'IPv4' && !inter[j].internal) {
+                return inter[j].address
+            }
+        }
+    }
+}
+ServerStatus.localip = getLocalIp() + ":0000";
+
 
 ServerStatus.build = getLatestLocalBuildId();
 
