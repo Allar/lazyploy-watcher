@@ -20,13 +20,23 @@ Array.prototype.firstElementIncluding = function(includeSearch) {
     return null;
 }
 
-// User settings
+// Expected args
+// -lazyploy=http://lazyploy.server/
+// -project=ProjectName
+// -platform=TargetPlatform
+
+// Default User settings
 var LazyployUrl = 'http://localhost/';
 var Project = "GenericShooter";
 var Platform = "WindowsServer";
-var PlatformName = Platform.includes('Windows') ? 'Win64' : 'Linux';
 
-var SearchExt = Platform.includes('Windows') ? '.exe' : '';
+// Set any settings passed via command line
+if (argv.hasOwnProperty('lazyploy')){ LazyployUrl = argv.lazyploy; }
+if (argv.hasOwnProperty('project')){ Project = argv.project; }
+if (argv.hasOwnProperty('platform')){ Platform = argv.platform; }
+
+var PlatformName = Platform.includes('Windows') ? 'Win64' : 'Linux';
+var SearchExt = Platform.includes('Windows') ? '.exe' : Project;
 var EngineBinaryFolder = null;
 var ProjectBinaryFolder = null;
 
