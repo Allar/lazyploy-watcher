@@ -43,6 +43,7 @@ var bBusy = false;
 var ServerStatus = {
     hostname: os.hostname(),
     localip: '0.0.0.0:0000',
+    project: Project,
     platform: Platform,
     build: -1,
     status: 'Dandy' 
