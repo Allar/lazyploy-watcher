@@ -11,6 +11,9 @@ var unzip = require('unzip');
 var child_process = require('child_process');
 var argv = require('minimist')(process.argv.slice(2));
 var uuid = require('node-uuid');
+var prompt = require('prompt');
+var deasync = require('deasync');
+var jsonfile = require('jsonfile'); 
 
 // Prototypes
 Array.prototype.firstElementIncluding = function(includeSearch) {
@@ -21,18 +24,69 @@ Array.prototype.firstElementIncluding = function(includeSearch) {
     }
     return null;
 }
+var bForceConfigPrompt = false;
+if (argv.hasOwnProperty('config')) { bForceConfigPrompt = true }
 
-// Expected args
+// Try to load config settings, if it doesn't exist, prompt
+// the user to provide these settings
+var StoredSettings = require("./lazyploy-config.json");
+if (!StoredSettings.initialized || bForceConfigPrompt) {
+    
+    function promptForSettings() {
+        var schema = {
+            properties: {
+                lazyploy: {
+                    description: `URL of Lazyploy Server`,
+                    default: StoredSettings.LazyployUrl
+                },
+                project: {
+                    description: `Name of Project`,
+                    default: StoredSettings.Project
+                },
+                platform: {
+                    description: `Build Platform`,
+                    default: StoredSettings.Platform
+                },
+                sessionowner: {
+                    description: `Owner name of session for remote session connections`,
+                    default: StoredSettings.SessionOwner
+                }
+            }
+        };
+        
+        prompt.override = argv;
+        prompt.start();
+        
+        var syncPromptGet = deasync(prompt.get);
+        
+        var result = syncPromptGet(schema);
+        StoredSettings.LazyployUrl = result.lazyploy;
+        StoredSettings.Project = result.project;
+        StoredSettings.Platform = result.platform;
+        StoredSettings.SessionOwner = result.sessionowner;
+        StoredSettings.initialized = true;
+        
+        jsonfile.writeFile('./lazyploy-config.json', StoredSettings, (err) => {
+            if (err) {
+                console.error(`Error writing new settings: ${err}`);
+                throw(err);
+            }
+        });
+    }
+    deasync(promptForSettings)();
+}
+
+// Override config args
 // --lazyploy=http://lazyploy.server/
 // --project=ProjectName
 // --platform=TargetPlatform
 // --sessionowner=SessionOwner
 
 // Default User settings
-var LazyployUrl = 'http://localhost/';
-var Project = "GenericShooter";
-var Platform = "WindowsServer";
-var SessionOwner = "Allar";
+var LazyployUrl = StoredSettings.LazyployUrl;
+var Project = StoredSettings.Project;
+var Platform = StoredSettings.Platform;
+var SessionOwner = StoredSettings.SessionOwner;
 
 // Set any settings passed via command line
 if (argv.hasOwnProperty('lazyploy')){ LazyployUrl = argv.lazyploy; }
@@ -191,7 +245,7 @@ function findExecFileInDir(Dir, SearchExt) {
         readdirAsync(Dir)
         .then((files) => {
             if (files.length > 0) {
-                execFile = files.firstElementIncluding(SearchExt);
+                var execFile = files.firstElementIncluding(SearchExt);
                 if (execFile != null) {
                     console.log(`Found execFile: ${execFile}`);
                     resolve(execFile);
@@ -207,7 +261,6 @@ function findExecFileInDir(Dir, SearchExt) {
 
 function findExecFile() {
     return new Promise(function(resolve, reject) {       
-        var isValidBuild = false;
        
         // Linux exec is always ProjectName/Binaries/Linux/ProjectName
         if (Platform.includes('Linux')) {
@@ -265,15 +318,15 @@ function startRunningProcess() {
             args.push('-AllowStdOutLogVerbosity');
             args.push('-Messaging');
             args.push(`-InstanceId=${uuid.v4()}`);
-            args.push(`-SessionId=${uuid.v4()}`);
+            args.push(`-SessionId=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa`);
             args.push(`-SessionOwner=${SessionOwner}`);
-            args.push(`-SessionName=${Platform}_${new Date().toString()}`);
+            args.push(`-SessionName=Lazyploy Servers`);
            
             console.log(`Starting process: ${execFile}`);
             
             if (Platform.includes('Linux')) {
                 child_process.execSync(`chmod +x ${Project}`, opts);
-		RunningProcess = child_process.spawn('./' + path.basename(execFile), args, opts);
+                RunningProcess = child_process.spawn('./' + path.basename(execFile), args, opts);
             } else {
                 RunningProcess = child_process.spawn(path.basename(execFile), args, opts);
             } 

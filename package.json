@@ -10,11 +10,14 @@
   "license": "ISC",
   "dependencies": {
     "bluebird": "^3.3.0",
+    "deasync": "^0.1.4",
     "fs-extra": "^0.26.5",
+    "jsonfile": "^2.2.3",
     "minimist": "^1.2.0",
     "mkdirp": "^0.5.1",
     "node-uuid": "^1.4.7",
+    "prompt": "^1.0.0",
     "unirest": "^0.4.2",
-    "unzip": "^0.1.11"
+    "unzip": "^0.1.11",
   }
 }
