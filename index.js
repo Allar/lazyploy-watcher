@@ -30,8 +30,7 @@ if (argv.hasOwnProperty('config')) { bForceConfigPrompt = true }
 // Try to load config settings, if it doesn't exist, prompt
 // the user to provide these settings
 var StoredSettings = require("./lazyploy-config.json");
-if (!StoredSettings.initialized || bForceConfigPrompt) {
-    
+if (StoredSettings == null || !StoredSettings.initialized || bForceConfigPrompt) {
     function promptForSettings() {
         var schema = {
             properties: {
@@ -77,6 +76,7 @@ if (!StoredSettings.initialized || bForceConfigPrompt) {
 }
 
 // Override config args
+// --config Runs config prompt
 // --lazyploy=http://lazyploy.server/
 // --project=ProjectName
 // --platform=TargetPlatform
