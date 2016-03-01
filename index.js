@@ -263,13 +263,21 @@ function findExecFile() {
     return new Promise(function(resolve, reject) {       
        
         // Linux exec is always ProjectName/Binaries/Linux/ProjectName
-        if (Platform.includes('Linux')) {
-            console.log(`Checking for Linux project binary in: ${ProjectBinaryFolder}`);
+        if (Platform.includes('LinuxServer')) {
+            console.log(`Checking for Linux Server binary in: ${ProjectBinaryFolder}`);
+            findExecFileInDir(ProjectBinaryFolder, SearchExt + 'Server').then((execFile) => {
+                resolve(path.join(ProjectBinaryFolder, execFile));
+            }).catch( (err) => {
+                console.error('Failed to find Linux server binary.');
+                reject('Failed to find Linux server binary.');
+            });
+        } else if (Platform.includes('LinuxNoEditor')) {
+            console.log(`Checking for Linux client binary in: ${ProjectBinaryFolder}`);
             findExecFileInDir(ProjectBinaryFolder, SearchExt).then((execFile) => {
                 resolve(path.join(ProjectBinaryFolder, execFile));
             }).catch( (err) => {
-                console.error('Failed to find Linux project binary.');
-                reject('Failed to find Linux project binary.');
+                console.error('Failed to find Linux client binary.');
+                reject('Failed to find Linux client binary.');
             });
         } else { // Windows
             // Check for C++ project binary first
