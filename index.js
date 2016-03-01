@@ -147,8 +147,7 @@ function getLocalIp() {
         }
     }
 }
-ServerStatus.localip = getLocalIp() + ":0000";
-
+ServerStatus.localip = getLocalIp() + ':' + StoredSettings.Port;
 
 ServerStatus.build = getLatestLocalBuildId();
 
