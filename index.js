@@ -13,7 +13,8 @@ var argv = require('minimist')(process.argv.slice(2));
 var uuid = require('node-uuid');
 var prompt = require('prompt');
 var deasync = require('deasync');
-var jsonfile = require('jsonfile'); 
+var jsonfile = require('jsonfile');
+var replace = require("replace");
 
 // Prototypes
 Array.prototype.firstElementIncluding = function(includeSearch) {
@@ -49,6 +50,14 @@ if (StoredSettings == null || !StoredSettings.initialized || bForceConfigPrompt)
                 sessionowner: {
                     description: `Owner name of session for remote session connections`,
                     default: StoredSettings.SessionOwner
+                },
+                port: {
+                    description: `Game Port`,
+                    default: StoredSettings.Port
+                },
+                steamport: {
+                    description: `Steam Query Port`,
+                    default: StoredSettings.SteamPort
                 }
             }
         };
@@ -63,6 +72,8 @@ if (StoredSettings == null || !StoredSettings.initialized || bForceConfigPrompt)
         StoredSettings.Project = result.project;
         StoredSettings.Platform = result.platform;
         StoredSettings.SessionOwner = result.sessionowner;
+        StoredSettings.Port = result.port;
+        StoredSettings.SteamPort = result.steamport;
         StoredSettings.initialized = true;
         
         jsonfile.writeFile('./lazyploy-config.json', StoredSettings, (err) => {
@@ -70,6 +81,7 @@ if (StoredSettings == null || !StoredSettings.initialized || bForceConfigPrompt)
                 console.error(`Error writing new settings: ${err}`);
                 throw(err);
             }
+            process.exit(0);
         });
     }
     deasync(promptForSettings)();
@@ -332,6 +344,22 @@ function startRunningProcess() {
            
             console.log(`Starting process: ${execFile}`);
             
+            // Update port config
+            var ConfigPath = path.join(BuildsDir, ServerStatus.build.toString(), Project, 'Config', 'DefaultEngine.ini');
+            replace({
+                regex: "\\bPort=\\d+",
+                replacement: `Port=${StoredSettings.Port}`,
+                paths: [ConfigPath],
+                silent: true,
+            });
+            replace({
+                regex: "\\bGameServerQueryPort=\\d+",
+                replacement: `GameServerQueryPort=${StoredSettings.SteamPort}`,
+                paths: [ConfigPath],
+                silent: true,
+            });
+            
+            // Spawn the process            
             if (Platform.includes('Linux')) {
                 child_process.execSync(`chmod +x ${path.basename(execFile)}`, opts);
                 RunningProcess = child_process.spawn('./' + path.basename(execFile), args, opts);

@@ -17,6 +17,7 @@
     "mkdirp": "^0.5.1",
     "node-uuid": "^1.4.7",
     "prompt": "^1.0.0",
+    "replace": "^0.3.0",
     "unirest": "^0.4.2",
     "unzip": "^0.1.11"
   }

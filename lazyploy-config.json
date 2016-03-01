@@ -1,7 +1,1 @@
-{
-    "initialized": false,
-    "LazyployUrl": "http://localhost/",
-    "Project": "GenericShooter",
-    "Platform":"LinuxServer",
-    "SessionOwner":"Allar"
-}
+{"initialized":true,"LazyployUrl":"http://lazyployserver/","Project":"GenericShooter","Platform":"LinuxServer","SessionOwner":"Allar","Port":"8000","SteamPort":"30000"}
