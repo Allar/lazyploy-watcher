@@ -345,18 +345,24 @@ function startRunningProcess() {
             
             // Update port config
             var ConfigPath = path.join(BuildsDir, ServerStatus.build.toString(), Project, 'Config', 'DefaultEngine.ini');
-            replace({
-                regex: "\\bPort=\\d+",
-                replacement: `Port=${StoredSettings.Port}`,
-                paths: [ConfigPath],
-                silent: true,
-            });
-            replace({
-                regex: "\\bGameServerQueryPort=\\d+",
-                replacement: `GameServerQueryPort=${StoredSettings.SteamPort}`,
-                paths: [ConfigPath],
-                silent: true,
-            });
+            
+            try {
+                    replace({
+                    regex: "\\bPort=\\d+",
+                    replacement: `Port=${StoredSettings.Port}`,
+                    paths: [ConfigPath],
+                    silent: true,
+                });
+                replace({
+                    regex: "\\bGameServerQueryPort=\\d+",
+                    replacement: `GameServerQueryPort=${StoredSettings.SteamPort}`,
+                    paths: [ConfigPath],
+                    silent: true,
+                });
+            } catch (e) {
+                reject(e);
+                return;
+            }
             
             // Spawn the process            
             if (Platform.includes('Linux')) {
