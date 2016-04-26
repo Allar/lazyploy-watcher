@@ -276,7 +276,7 @@ function findExecFile() {
         // Linux exec is always ProjectName/Binaries/Linux/ProjectName
         if (Platform.includes('LinuxServer')) {
             console.log(`Checking for Linux Server binary in: ${ProjectBinaryFolder}`);
-            findExecFileInDir(ProjectBinaryFolder, SearchExt + 'Server').then((execFile) => {
+            findExecFileInDir(ProjectBinaryFolder, SearchExt).then((execFile) => {
                 resolve(path.join(ProjectBinaryFolder, execFile));
             }).catch( (err) => {
                 console.error('Failed to find Linux server binary.');
